@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material';
-import { EndGameDialogComponent } from 'src/app/compression-crash-course/compression-showcase/page-data-and-information/end-game-dialog/end-game-dialog.component';
 import * as SimplexNoise from 'simplex-noise';
+import { EndGameDialogComponent } from 'src/app/compression-crash-course/compression-showcase/page-data-and-information/end-game-dialog/end-game-dialog.component';
 
 /**
  * Returns an array of integers in range [0..count]
@@ -48,7 +48,8 @@ enum ActionsEnum {
   HEAT = 'heat',
   FREEZE = 'freeze',
   SPILL_OIL = 'spill_oil',
-  DIG = 'dig'
+  DIG = 'dig',
+  SHOOT = 'shoot'
 }
 
 class ActiveEffect {
@@ -93,6 +94,7 @@ class GridsCell {
   activeEffect: ActiveEffect;
   occupier: Worm;
   isActionable: boolean;
+  isAttackable: boolean;
   nearCells: NearCells = <NearCells>{};
   ipInfo: ImageProcessingInfo = <ImageProcessingInfo>{}; // Image Processing Info, used ONLY during map generation
 
@@ -108,22 +110,28 @@ class GridsRow {
 class Worm {
   id: number;
   name: string;
-  hitPoints: number = 100;
-  resources: number = 1000;
-  score: number = 0;
+  hitPoints = 100;
+  resources = 1000;
+  score = 0;
   x: number;
   y: number;
   activeEffect: ActiveEffect;
+  weapon = new BasicGun();
+}
+
+class BasicGun {
+  damage = 20;
+  range = 20;
 }
 
 class MapConfig {
-  xMax: number = 31;
-  yMax: number = 15;
+  xMax = 31;
+  yMax = 15;
   seed: number = Math.round(Math.random() * 10e15);
-  playersCount: number = 2;
-  roundsMax: number = 400;
-  round: number = 0;
-  private altitude: number = 0.3; // Height of map completely filled
+  playersCount = 2;
+  roundsMax = 400;
+  round = 0;
+  private altitude = 0.3; // Height of map completely filled
 
   /**
    * Returns the inverse of altitude, which is the intended Y value for altitude
@@ -167,7 +175,7 @@ export class PageDataAndInformationComponent implements OnInit {
 
       case ActionsEnum.DIG:
         cell.surfaceType = SurfaceTypeEnum.AIR;
-        
+
       case ActionsEnum.MOVE:
         this.rows[this.playerOnTurn.y].columns[this.playerOnTurn.x].occupier = undefined;
         this.setPlayerAsOccupier(this.playerOnTurn, cell);
@@ -200,10 +208,22 @@ export class PageDataAndInformationComponent implements OnInit {
         };
         break;
 
+      case ActionsEnum.SHOOT:
+        cell.occupier.hitPoints -= this.playerOnTurn.weapon.damage;
+        break;
+
     }
 
     this.processRound();
 
+  }
+
+  public setMapMode(event) {
+    this.loading = true;
+    setTimeout(() => {
+      this.setupNewGame(event.value === 'space');
+      this.loading = false;
+    }, 0);
   }
 
   private updatePlayerEffectValues(player) {
@@ -242,7 +262,7 @@ export class PageDataAndInformationComponent implements OnInit {
     this.mapConfig.round++;
     this.applyEffectResultsToPlayers();
 
-    let playersAlive = this.players.filter(p => p.hitPoints > 0);
+    const playersAlive = this.players.filter(p => p.hitPoints > 0);
     if (playersAlive.length === 0) {
       this.endGameState('Draw!');
       return;
@@ -255,8 +275,30 @@ export class PageDataAndInformationComponent implements OnInit {
     this.allCellsRef.filter(cell => cell.activeEffect)
       .forEach(cell => cell.activeEffect = this.updateActiveEffect(cell.activeEffect));
 
-    this.allCellsRef.forEach(cell => cell.isActionable = false);
-    let maskArray = [...Array(3)
+    this.allCellsRef.forEach(cell => {
+      cell.isAttackable = false;
+      cell.isActionable = false;
+    });
+    this.playerOnTurn = this.players.find(p => p.id === this.playerOnTurn.id % this.mapConfig.playersCount + 1);
+
+    this.markAdjacentCellsAsActionable();
+    this.markPlayersInRangeAsActionable();
+  }
+
+  private markPlayersInRangeAsActionable() {
+    const activeWeapon = this.playerOnTurn.weapon;
+    this.players.filter(p => p !== this.playerOnTurn)
+      .forEach(
+        p => {
+          if (euclideanDistance(this.playerOnTurn, p) <= activeWeapon.range) {
+            this.rows[p.y].columns[p.x].isAttackable = true;
+          }
+        }
+      );
+  }
+
+  private markAdjacentCellsAsActionable() {
+    const maskArray = [...Array(3)
       .keys()]
       .map(i => i - 1)
       .reduce((sum, c, i, a) => {
@@ -264,13 +306,14 @@ export class PageDataAndInformationComponent implements OnInit {
         return sum;
       }, []);
 
-    this.playerOnTurn = this.players.find(p => p.id === this.playerOnTurn.id % this.mapConfig.playersCount + 1);
-    let p = this.playerOnTurn;
+    const p = this.playerOnTurn;
     maskArray.forEach(pos => {
-      if (!this.rows[p.y + pos.y] || !this.rows[p.y + pos.y].columns[p.x + pos.x]) {
+      const affectedY = p.y + pos.y;
+      const affectedX = (p.x + pos.x + this.rows[0].columns.length) % this.rows[0].columns.length;
+      if (!this.rows[affectedY] || !this.rows[affectedY].columns[affectedX]) {
         return;
       }
-      let cellToEnable = this.rows[p.y + pos.y].columns[p.x + pos.x];
+      const cellToEnable = this.rows[affectedY].columns[affectedX];
       if (cellToEnable.occupier
         || (cellToEnable.surfaceType === SurfaceTypeEnum.AIR && cellToEnable.cellBelowMe.surfaceType === SurfaceTypeEnum.AIR)
         || (cellToEnable.surfaceType === SurfaceTypeEnum.AIR && p.activeEffect && p.activeEffect.type === EffectsEnum.OIL)) {
@@ -345,7 +388,7 @@ export class PageDataAndInformationComponent implements OnInit {
     this.players = [...Array(this.mapConfig.playersCount)
       .keys()]
       .map(i => {
-        let player = new Worm();
+        const player = new Worm();
         player.id = i + 1;
         player.name = String.fromCharCode(i + 65);
 
@@ -355,14 +398,14 @@ export class PageDataAndInformationComponent implements OnInit {
     // Set starting locations for players as far away from other players as possible
     this.players
       .forEach(player => { // TODO: check overlapping player positions
-        let validSpawnPoint = this.allCellsRef.filter(
+        const validSpawnPoint = this.allCellsRef.filter(
           cell => cell.surfaceType === SurfaceTypeEnum.AIR || cell.surfaceType === SurfaceTypeEnum.SPACE)
           .map(cell => {
-            let playerDistances = this.players
+            const playerDistances = this.players
               .filter(p => p.x !== undefined && p.y !== undefined)
               .map(p => euclideanDistance(cell, p));
 
-            let minDistance = playerDistances.sort((a, b) => a - b)[0];
+            const minDistance = playerDistances.sort((a, b) => a - b)[0];
             return {cell, minDistance};
           })
           .sort((a, b) => b.minDistance - a.minDistance)[0];
@@ -386,7 +429,7 @@ export class PageDataAndInformationComponent implements OnInit {
 
   private setupNewGame(isSpace = false) {
     // Make a template. Modify this to make the real map
-    let {template, flatTemplate} = this.generateMapTemplate();
+    const {template, flatTemplate} = this.generateMapTemplate();
 
     if (isSpace) {
       this.makeSpaceMap(flatTemplate);
@@ -448,10 +491,10 @@ export class PageDataAndInformationComponent implements OnInit {
         gc.surfaceType = SurfaceTypeEnum.AIR;
       } else {
         // Get region data that is similar to landscape. This makes grass "follow" the hills
-        let zoom = 0.2;
-        let terrainValue = this.simplex.noise2D(gc.x * zoom, gc.y * zoom) * 0.5 + 0.5;
+        const zoom = 0.2;
+        const terrainValue = this.simplex.noise2D(gc.x * zoom, gc.y * zoom) * 0.5 + 0.5;
 
-        let soilAmount = 0.55;
+        const soilAmount = 0.55;
         if (terrainValue < soilAmount
           // OR, "neighbour cells" and their "neighbours cells", all are NOT air squares. 2 level deep grass
           || (gc.nearCells.cardinalList().every(nc => nc.nearCells.cardinalList()
@@ -466,8 +509,8 @@ export class PageDataAndInformationComponent implements OnInit {
 
       if (gc.y > this.mapConfig.yMax * 0.8) {
         // Add Bed rock, but on different data that does NOT follow the landscape (.noise3D instead of 2D)
-        let zoom = 0.2;
-        let terrainValue = this.simplex.noise3D(gc.x * zoom, gc.y * zoom, 0) * 0.5 + 0.5;
+        const zoom = 0.2;
+        const terrainValue = this.simplex.noise3D(gc.x * zoom, gc.y * zoom, 0) * 0.5 + 0.5;
         gc.surfaceType = (terrainValue < 0.3) ? SurfaceTypeEnum.ROCK : gc.surfaceType;
       }
 
@@ -475,7 +518,7 @@ export class PageDataAndInformationComponent implements OnInit {
   }
 
   private makeSpaceMap(flatTemplate) {
-    let amountOfSoil = 0.45;
+    const amountOfSoil = 0.45;
     flatTemplate.forEach(gc => {
       if (gc.ipInfo.srcValue < amountOfSoil) {
         gc.surfaceType = SurfaceTypeEnum.ASTEROID;
@@ -487,7 +530,7 @@ export class PageDataAndInformationComponent implements OnInit {
 
   private generateMapTemplate() {
     // Make a map sized array of arrays. Arranged as a[x][y]. On screen, Y "ascends" DOWNWARDS
-    let template = intRange(this.mapConfig.xMax + 1)
+    const template = intRange(this.mapConfig.xMax + 1)
       .map(i => <GridsCell[]>intRange(this.mapConfig.yMax + 1)
         .map(j => <GridsCell>({
           x: i,
@@ -497,7 +540,7 @@ export class PageDataAndInformationComponent implements OnInit {
         })));
 
 
-    let flatTemplate = flatMap<GridsCell>(template);
+    const flatTemplate = flatMap<GridsCell>(template);
     // Setup neighbour cells for every cell, and landscape template data
     flatTemplate.forEach(gc => {
       gc.nearCells.above = template[gc.x][gc.y - 1];
@@ -505,7 +548,7 @@ export class PageDataAndInformationComponent implements OnInit {
       gc.nearCells.left = (template[gc.x - 1] || [])[gc.y];
       gc.nearCells.right = (template[gc.x + 1] || [])[gc.y];
 
-      let zoom = 0.2;
+      const zoom = 0.2;
       gc.ipInfo.srcValue = this.simplex.noise2D(gc.x * zoom, gc.y * zoom) * 0.5 + 0.5;
 
       // Deprecated
@@ -513,14 +556,6 @@ export class PageDataAndInformationComponent implements OnInit {
       gc.cellBelowMe = <GridsCell>{};
     });
     return {template, flatTemplate};
-  }
-
-  public setMapMode(event) {
-    this.loading = true;
-    setTimeout(() => {
-      this.setupNewGame(event.value === 'space');
-      this.loading = false;
-    }, 0);
   }
 
 

@@ -37,42 +37,42 @@
         <div class="cell-container"
              [class.hover-action-clickable]="cell.isActionable">
 
-          <div *ngIf="cell.isActionable"
+          <div *ngIf="cell.isActionable || cell.isAttackable"
                class="square overlap"
                [matMenuTriggerFor]="actionsMenu"
                style="z-index: 4; color: red">
             * <!--action marker-->
             <mat-menu #actionsMenu="matMenu">
-              <button *ngIf="cell.surfaceType === surfaceTypeEnum.AIR"
+              <button *ngIf="cell.isActionable && cell.surfaceType === surfaceTypeEnum.AIR"
                       mat-menu-item
                       (click)="doPlayerAction(cell, actionsEnum.MOVE)">Move here
               </button>
 
-              <button *ngIf="cell.surfaceType !== surfaceTypeEnum.AIR"
+              <button *ngIf="cell.isActionable && cell.surfaceType !== surfaceTypeEnum.AIR"
                       mat-menu-item
                       (click)="doPlayerAction(cell, actionsEnum.HEAT)">Heat this block
               </button>
 
-              <button *ngIf="cell.surfaceType !== surfaceTypeEnum.AIR"
+              <button *ngIf="cell.isActionable && cell.surfaceType !== surfaceTypeEnum.AIR"
                       mat-menu-item
                       (click)="doPlayerAction(cell, actionsEnum.DIG)">Dig through this block
               </button>
 
-              <button *ngIf="cell.surfaceType !== surfaceTypeEnum.AIR"
+              <button *ngIf="cell.isActionable && cell.surfaceType !== surfaceTypeEnum.AIR"
                       mat-menu-item
                       (click)="doPlayerAction(cell, actionsEnum.FREEZE)">Freeze this block
               </button>
 
-              <button *ngIf="cell.surfaceType !== surfaceTypeEnum.AIR"
+              <button *ngIf="cell.isActionable && cell.surfaceType !== surfaceTypeEnum.AIR"
                       mat-menu-item
                       (click)="doPlayerAction(cell, actionsEnum.SPILL_OIL)">Spill oil on this block
               </button>
 
-              <button *ngIf="cell.occupier != null"
+              <button *ngIf="cell.isAttackable"
                       mat-menu-item
-                      (click)="doPlayerAction(cell, actionsEnum.SPILL_OIL)">Spill oil on this block
+                      (click)="doPlayerAction(cell, actionsEnum.SHOOT)">Shoot!
               </button>
-              
+
             </mat-menu>
           </div>
 
