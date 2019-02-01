@@ -55,6 +55,11 @@
 
               <button *ngIf="cell.surfaceType !== surfaceTypeEnum.AIR"
                       mat-menu-item
+                      (click)="doPlayerAction(cell, actionsEnum.DIG)">Dig through this block
+              </button>
+
+              <button *ngIf="cell.surfaceType !== surfaceTypeEnum.AIR"
+                      mat-menu-item
                       (click)="doPlayerAction(cell, actionsEnum.FREEZE)">Freeze this block
               </button>
 
@@ -62,6 +67,12 @@
                       mat-menu-item
                       (click)="doPlayerAction(cell, actionsEnum.SPILL_OIL)">Spill oil on this block
               </button>
+
+              <button *ngIf="cell.occupier != null"
+                      mat-menu-item
+                      (click)="doPlayerAction(cell, actionsEnum.SPILL_OIL)">Spill oil on this block
+              </button>
+              
             </mat-menu>
           </div>
 

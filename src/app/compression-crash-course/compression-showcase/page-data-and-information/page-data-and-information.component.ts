@@ -47,7 +47,8 @@ enum ActionsEnum {
   MOVE = 'move',
   HEAT = 'heat',
   FREEZE = 'freeze',
-  SPILL_OIL = 'spill_oil'
+  SPILL_OIL = 'spill_oil',
+  DIG = 'dig'
 }
 
 class ActiveEffect {
@@ -136,7 +137,7 @@ class MapConfig {
 @Component({
   selector: 'app-page-data-and-information',
   templateUrl: './page-data-and-information.component.html',
-             styleUrls: ['./stylings.scss']
+  styleUrls: ['./stylings.scss']
 })
 export class PageDataAndInformationComponent implements OnInit {
 
@@ -164,6 +165,9 @@ export class PageDataAndInformationComponent implements OnInit {
   public doPlayerAction(cell: GridsCell, action: ActionsEnum) {
     switch (action) {
 
+      case ActionsEnum.DIG:
+        cell.surfaceType = SurfaceTypeEnum.AIR;
+        
       case ActionsEnum.MOVE:
         this.rows[this.playerOnTurn.y].columns[this.playerOnTurn.x].occupier = undefined;
         this.setPlayerAsOccupier(this.playerOnTurn, cell);
@@ -195,6 +199,7 @@ export class PageDataAndInformationComponent implements OnInit {
           timeLeft: 4,
         };
         break;
+
     }
 
     this.processRound();
@@ -228,8 +233,8 @@ export class PageDataAndInformationComponent implements OnInit {
           message: message
         }
       })
-          .afterClosed()
-          .subscribe();
+        .afterClosed()
+        .subscribe();
     });
   }
 
@@ -282,31 +287,31 @@ export class PageDataAndInformationComponent implements OnInit {
         switch (cell.activeEffect.type) {
           case EffectsEnum.HOT:
             cell.cellAboveMe.occupier.activeEffect = <ActiveEffect>{
-                placedByPLayer: cell.activeEffect.placedByPLayer,
-                type: EffectsEnum.HOT,
-                value: 20,
-                timeLeft: 1
-              };
-              break;
+              placedByPLayer: cell.activeEffect.placedByPLayer,
+              type: EffectsEnum.HOT,
+              value: 20,
+              timeLeft: 1
+            };
+            break;
 
           case EffectsEnum.COLD:
             cell.cellAboveMe.occupier.activeEffect = <ActiveEffect>{
-                placedByPLayer: cell.activeEffect.placedByPLayer,
-                type: EffectsEnum.COLD,
-                value: 10,
-                timeLeft: 2
-              };
-              break;
+              placedByPLayer: cell.activeEffect.placedByPLayer,
+              type: EffectsEnum.COLD,
+              value: 10,
+              timeLeft: 2
+            };
+            break;
 
           case EffectsEnum.OIL:
             cell.cellAboveMe.occupier.activeEffect = <ActiveEffect>{
-                placedByPLayer: cell.activeEffect.placedByPLayer,
-                type: EffectsEnum.OIL,
-                value: 0,
-                timeLeft: 4
-              };
-              break;
-          }
+              placedByPLayer: cell.activeEffect.placedByPLayer,
+              type: EffectsEnum.OIL,
+              value: 0,
+              timeLeft: 4
+            };
+            break;
+        }
       });
   }
 
